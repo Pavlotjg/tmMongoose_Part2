@@ -1,6 +1,7 @@
-module.exports = {createUser, getUsers, updateUser, getUser, deleteUser};
+module.exports = {createUser, updateUser, getUser, deleteUser, getArticlesByUser};
 
 const User = require('../models/user');
+const Article = require('../models/article');
 
 async function createUser(req, res) {
   try {
@@ -18,23 +19,36 @@ async function createUser(req, res) {
   }
 }
 
-async function getUsers(req, res) {
+async function getUser(req, res) {
   try {
-    const users = await User.find({});
+    const {userId} = req.params;
+    const user = await User.findOne({_id: userId});
+    if(!user){
+      res.status(400);
+      res.send('There is no such user');
+      return
+    }
+    const articles = await Article.find({owner: userId});
     res.status(200);
-    res.send(users);
+    res.send({user, articles});
   } catch (err) {
     console.log(err);
     res.status(500).send('Internal Server Error');
   }
 }
 
-async function getUser(req, res) {
+async function getArticlesByUser(req, res){
   try {
-    const {id} = req.params;
-    const user = await User.find({_id: id});
+    const {userId} = req.params;
+    const user = await User.findOne({_id: userId});
+    if(!user){
+      res.status(400);
+      res.send('There is no such user');
+      return
+    }
+    const articles = await Article.find({owner: userId});
     res.status(200);
-    res.send(user);
+    res.send(articles);
   } catch (err) {
     console.log(err);
     res.status(500).send('Internal Server Error');
@@ -44,14 +58,11 @@ async function getUser(req, res) {
 async function updateUser(req, res) {
   try {
     const {firstName, lastName} = req.body;
-
-    const {id} = req.params;
-    console.log(firstName, lastName);
-    //TODO: figure out how to omit undefined ; $set: vs nothing
-    const user = await User.findOneAndUpdate({_id: id}, {firstName, lastName});
+    const {userId} = req.params;
+    const user = await User.findOneAndUpdate({_id: userId}, {$set: {firstName, lastName}});
     await user.save();
     res.status(200);
-    res.send(`User with id: ${id} updated`);
+    res.send(`User with id: ${userId} updated`);
   } catch (e) {
     if(e.name === 'ValidationError'){
       res.status(400);
@@ -63,11 +74,12 @@ async function updateUser(req, res) {
 }
 
 async function deleteUser(req, res) {
-  const {id} = req.params;
+  const {userId} = req.params;
   try {
-    await User.deleteOne({_id: id});
+    await User.deleteOne({_id: userId});
+    await Article.deleteMany({owner: userId});
     res.status(200);
-    res.send(`Todo with id: ${id} was successfully deleted`);
+    res.send(`User with id: ${userId} and all his articles was successfully deleted`);
   }catch (e) {
     res.status(500);
     res.send('Internal Server Error');

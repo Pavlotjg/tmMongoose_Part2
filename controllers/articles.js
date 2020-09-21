@@ -14,15 +14,14 @@ async function getArticles(req, res) {
       'createdAt',
       'updatedAt'
     ];
-
-    //TODO: maybe we can ignore undefined fields on FIND-level
     const query = criterias.reduce((acc, criteria) => {
       if(req.query[criteria]){
         acc[criteria] = req.query[criteria];
       }
       return acc;
     }, {});
-    const articles = await Article.find(query).populate('owner');
+    const articles = await Article.find(query).populate('owner', ['firstName', 'lastName']);
+
     res.status(200);
     res.send(articles);
   } catch (err) {
@@ -43,8 +42,7 @@ async function createArticles(req, res) {
     if (user) {
       const article = await new Article({...req.body});
       await article.save();
-      //TODO: aggregate field?
-      await User.findOneAndUpdate({_id: owner}, {numberOfArticles: user.numberOfArticles + 1});
+      await User.findOneAndUpdate({_id: owner}, {$inc: {numberOfArticles: 1}});
       res.status(201);
       res.send('article created');
     } else {
@@ -73,8 +71,7 @@ async function updateArticle(req, res) {
     const {owner} = article;
     const user = await User.find({_id: owner});
     if (user) {
-      const upd = await Article.findOneAndUpdate({_id: articleId}, {$set: {...req.body}});
-      console.log(upd);
+      await Article.findOneAndUpdate({_id: articleId}, {$set: {...req.body}});
       res.status(200);
       res.send('Article successfully updated');
     } else {
@@ -103,7 +100,7 @@ async function deleteArticle(req, res) {
     const {owner} = article;
     const user = await User.findOne({_id: owner});
     if (user) {
-      await User.findOneAndUpdate({_id: owner}, {numberOfArticles: user.numberOfArticles - 1});
+      await User.findOneAndUpdate({_id: owner}, {$inc: {numberOfArticles: -1}});
       await Article.findOneAndDelete({_id: articleId});
       res.status(200);
       res.send('Article successfully deleted');
